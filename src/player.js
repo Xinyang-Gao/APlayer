@@ -9,9 +9,11 @@ const STORAGE_KEYS = {
     position: 'player-widget-position',
     scale: 'player-widget-scale',
     collapsed: 'player-widget-collapsed',
+    mode: 'player-widget-mode',
     lyricsPosition: 'lyrics-position',
     lyricsVisible: 'lyrics-visible',
     lyricsSettings: 'lyrics-settings',
+    appearance: 'player-widget-appearance',
 };
 
 // 这些区域内的按下事件不触发拖拽，避免与控件冲突
@@ -21,6 +23,10 @@ const DRAG_EXCLUDE =
 const MIN_SCALE = 0.75;
 const MAX_SCALE = 1.6;
 const SCALE_STEP = 0.05;
+const MIN_OPACITY = 0.3;
+const MAX_BLUR = 24;
+const MODES = ['widget', 'full'];
+const DEFAULT_BLUR = 12;
 const DRAG_THRESHOLD = 5;
 const EDGE_MARGIN = 10;
 
@@ -75,8 +81,19 @@ export default {
         const lyricsPos = ref({ x: 0, y: 0 });
         const lyricsDragging = ref(false);
 
+        /* --- 形态与外观 --- */
+        const mode = ref(normalizeMode(props.options.mode ?? read(STORAGE_KEYS.mode, 'widget')));
+        const visible = ref(props.options.visible !== false);
+        const storedAppearance = readJSON(STORAGE_KEYS.appearance, {}) || {};
+        const appearance = ref({
+            widget: { opacity: 1, blur: DEFAULT_BLUR, ...(storedAppearance.widget || {}) },
+            full: { opacity: 1, blur: DEFAULT_BLUR, ...(storedAppearance.full || storedAppearance.card || {}) },
+        });
+        const lyricsCustom = ref(false); // 歌词浮层是否被用户拖过
+
         /* --- 位置与缩放 --- */
-        const position = ref(null);
+        const positionStore = ref(readJSON(STORAGE_KEYS.position, {}) || {});
+        const position = ref(positionStore.value[mode.value] || null);
         const dragging = ref(false);
         const scale = ref(clampScale(readJSON(STORAGE_KEYS.scale, 1)));
         const collapsed = ref(read(STORAGE_KEYS.collapsed, 'false') === 'true');
@@ -99,32 +116,62 @@ export default {
 
         const scalePercent = computed(() => Math.round(scale.value * 100));
 
+        /** 当前形态的外观（悬浮卡片 / 全屏卡片各自一套） */
+        const currentAppearance = computed(() => appearance.value[mode.value]);
+        /* 模板里用 v-model 直接改这两个属性 */
+        const appearanceProxy = computed(() => currentAppearance.value);
+        const opacityPercent = computed(() => Math.round(currentAppearance.value.opacity * 100));
+
+        /** 卡片内联样式：缩放 + 背景不透明度 + 背景模糊 */
+        const widgetStyle = computed(() => ({
+            '--aplayer-scale': scale.value,
+            '--aplayer-opacity': currentAppearance.value.opacity,
+            '--aplayer-blur': `${currentAppearance.value.blur}px`,
+        }));
+
         const rootStyle = computed(() => {
             if (!position.value) {
+                // 交给 CSS：悬浮形态落左下角，全屏形态居中
                 return null;
             }
-            return {
+            const style = {
                 left: `${position.value.left}px`,
                 top: `${position.value.top}px`,
                 right: 'auto',
                 bottom: 'auto',
             };
+            if (mode.value === 'full') {
+                // 居中靠 translate(-50%, -50%)，一旦手动定位就改回左上角对齐
+                style.transform = 'none';
+            }
+            return style;
         });
 
-        const lyricsStyle = computed(() => ({
-            left: `${lyricsPos.value.x}px`,
-            top: `${lyricsPos.value.y}px`,
-        }));
+        const lyricsStyle = computed(() => {
+            const { x, y } = lyricsPos.value;
+            if (!lyricsCustom.value) {
+                // 默认屏幕正下方居中
+                return { left: '50%', top: `${y}px`, transform: 'translateX(-50%)' };
+            }
+            return { left: `${x}px`, top: `${y}px` };
+        });
+
+        /* 卡片内歌词跟着文字色走，浮层歌词才用自定义颜色 */
+        const isInCard = computed(() => mode.value === 'full');
 
         const currentLineStyle = computed(() => ({
-            fontSize: `${settings.value.fontSize}px`,
-            color: settings.value.color,
+            fontSize: `${Math.round(settings.value.fontSize * (isInCard.value ? 0.62 : 1))}px`,
+            color: isInCard.value ? 'var(--text-color, #23231f)' : settings.value.color,
         }));
 
         const nextLineStyle = computed(() => ({
-            fontSize: `${settings.value.fontSize * 0.75}px`,
-            color: settings.value.color,
+            fontSize: `${Math.round(settings.value.fontSize * (isInCard.value ? 0.46 : 0.75))}px`,
+            color: isInCard.value ? 'var(--text-secondary, #6d6d66)' : settings.value.color,
         }));
+
+        const lyricsPlaceholderColor = computed(() =>
+            isInCard.value ? 'var(--text-secondary, #6d6d66)' : settings.value.color
+        );
 
         /* ---------------- 工具函数 ---------------- */
 
@@ -140,6 +187,18 @@ export default {
 
         function clampScale(value) {
             return clamp(Number(value) || 1, MIN_SCALE, MAX_SCALE);
+        }
+
+        function normalizeMode(value) {
+            return MODES.includes(value) ? value : 'widget';
+        }
+
+        function clampOpacity(value) {
+            return clamp(Number(value) || 1, MIN_OPACITY, 1);
+        }
+
+        function clampBlur(value) {
+            return clamp(Math.round(Number(value) || 0), 0, MAX_BLUR);
         }
 
         function clampPosition(left, top, width, height) {
@@ -400,6 +459,11 @@ export default {
 
         function scheduleCollapse() {
             window.clearTimeout(collapseTimer);
+            // 全屏卡片常驻展开，只有悬浮形态会空闲折叠
+            if (mode.value !== 'widget') {
+                setCollapsed(false);
+                return;
+            }
             if (interacting || playing.value) {
                 setCollapsed(false);
                 return;
@@ -464,7 +528,8 @@ export default {
                     return;
                 }
                 dragging.value = false;
-                writeJSON(STORAGE_KEYS.position, latest);
+                positionStore.value[mode.value] = latest;
+                writeJSON(STORAGE_KEYS.position, positionStore.value);
                 suppressNextClick();
             };
 
@@ -512,6 +577,7 @@ export default {
                     return;
                 }
                 lyricsDragging.value = false;
+                lyricsCustom.value = true;
                 writeJSON(STORAGE_KEYS.lyricsPosition, lyricsPos.value);
             };
 
@@ -541,6 +607,137 @@ export default {
 
         function resetSettings() {
             settings.value = { ...DEFAULT_SETTINGS };
+        }
+
+        /* ---------------- 形态与外观 ---------------- */
+
+        /** 切换形态：widget（悬浮小卡） / full（全屏卡片） */
+        function setMode(value) {
+            const nextMode = normalizeMode(value);
+            if (nextMode === mode.value) {
+                return;
+            }
+            mode.value = nextMode;
+            // 两种形态各记一份位置
+            position.value = positionStore.value[nextMode] || null;
+            write(STORAGE_KEYS.mode, nextMode);
+            emit('modechange', nextMode);
+        }
+
+        function toggleMode() {
+            setMode(mode.value === 'full' ? 'widget' : 'full');
+        }
+
+        /** 显示 / 隐藏整个播放器（隐藏时音频继续播放） */
+        function setVisible(value) {
+            const next = Boolean(value);
+            if (next === visible.value) {
+                return;
+            }
+            visible.value = next;
+            moreOpen.value = false;
+            menu.value.visible = false;
+            emit('visiblechange', next);
+        }
+
+        function show() {
+            setVisible(true);
+        }
+
+        function hide() {
+            setVisible(false);
+        }
+
+        function toggleVisible() {
+            setVisible(!visible.value);
+        }
+
+        /**
+         * 调整当前形态的背景不透明度与模糊度。
+         * 传 { opacity, blur } 改当前形态；也可以直接指定形态，如 { cardOpacity: 0.8 }。
+         */
+        function setAppearance(patch) {
+            if (!patch || typeof patch !== 'object') {
+                return;
+            }
+            const next = {
+                widget: { ...appearance.value.widget },
+                full: { ...appearance.value.full },
+            };
+            const assign = (target, key, value) => {
+                if (value === undefined || value === null) {
+                    return;
+                }
+                if (key === 'opacity') {
+                    target.opacity = clampOpacity(value);
+                } else if (key === 'blur') {
+                    target.blur = clampBlur(value);
+                }
+            };
+            assign(next[mode.value], 'opacity', patch.opacity);
+            assign(next[mode.value], 'blur', patch.blur);
+            assign(next.widget, 'opacity', patch.widgetOpacity);
+            assign(next.widget, 'blur', patch.widgetBlur);
+            // card* 是 full* 的别名，方便按“卡片”概念传参
+            assign(next.full, 'opacity', patch.fullOpacity ?? patch.cardOpacity);
+            assign(next.full, 'blur', patch.fullBlur ?? patch.cardBlur);
+            appearance.value = next;
+            emit('appearancechange', { mode: mode.value, ...next[mode.value] });
+        }
+
+        /** 桌面歌词显隐（外部可调） */
+        function setLyricsVisible(value) {
+            const next = Boolean(value);
+            if (next === lyricsVisible.value) {
+                return;
+            }
+            lyricsVisible.value = next;
+            write(STORAGE_KEYS.lyricsVisible, String(next));
+            emit('lyricschange', next);
+        }
+
+        /** 外部指定播放器位置（左上角坐标，传 null 回到默认位置） */
+        function setPosition(value) {
+            if (!value) {
+                positionStore.value[mode.value] = null;
+                position.value = null;
+                writeJSON(STORAGE_KEYS.position, positionStore.value);
+                return;
+            }
+            const { width, height } = widgetEl.value
+                ? widgetEl.value.getBoundingClientRect()
+                : { width: 320, height: 60 };
+            const next = clampPosition(Number(value.left) || 0, Number(value.top) || 0, width, height);
+            position.value = next;
+            positionStore.value[mode.value] = next;
+            writeJSON(STORAGE_KEYS.position, positionStore.value);
+        }
+
+        /** 外部指定歌词浮层位置；centered 为 true 时回到屏幕正下方居中 */
+        function setLyricsPosition(value) {
+            if (!value || value.centered) {
+                lyricsCustom.value = false;
+                lyricsPos.value = defaultLyricsPosition(true);
+                writeJSON(STORAGE_KEYS.lyricsPosition, null);
+                return;
+            }
+            lyricsCustom.value = true;
+            lyricsPos.value = { x: Number(value.x) || 0, y: Number(value.y) || 0 };
+            writeJSON(STORAGE_KEYS.lyricsPosition, lyricsPos.value);
+        }
+
+        /** 从“更多”菜单打开外观设置 */
+        function openAppearanceMenu() {
+            const anchor = moreEl.value;
+            const rect = anchor ? anchor.getBoundingClientRect() : { left: 40, bottom: 80 };
+            const width = 260;
+            const height = 260;
+            menu.value = {
+                visible: true,
+                x: clamp(rect.left - width + 40, EDGE_MARGIN, Math.max(EDGE_MARGIN, window.innerWidth - width - EDGE_MARGIN)),
+                y: clamp(rect.bottom - height, EDGE_MARGIN, Math.max(EDGE_MARGIN, window.innerHeight - height - EDGE_MARGIN)),
+            };
+            moreOpen.value = false;
         }
 
         /* ---------------- 菜单 ---------------- */
@@ -616,6 +813,10 @@ export default {
                 const { width, height } = widgetEl.value.getBoundingClientRect();
                 position.value = clampPosition(position.value.left, position.value.top, width, height);
             }
+            if (!lyricsCustom.value) {
+                lyricsPos.value = defaultLyricsPosition(true);
+                return;
+            }
             const node = rootEl.value && rootEl.value.querySelector('.lyrics-container');
             const rect = node ? node.getBoundingClientRect() : { width: 200, height: 60 };
             lyricsPos.value = {
@@ -624,15 +825,20 @@ export default {
             };
         }
 
-        function defaultLyricsPosition() {
-            const saved = readJSON(STORAGE_KEYS.lyricsPosition, null);
-            if (saved) {
-                return saved;
+        /** 歌词浮层默认位置：屏幕正下方居中；force 为 true 时忽略已保存的自定义位置 */
+        function defaultLyricsPosition(force) {
+            if (!force) {
+                const saved = readJSON(STORAGE_KEYS.lyricsPosition, null);
+                if (saved) {
+                    lyricsCustom.value = true;
+                    return saved;
+                }
             }
-            if (window.innerWidth < 768) {
-                return { x: 20, y: window.innerHeight - 200 };
-            }
-            return { x: Math.max(EDGE_MARGIN, window.innerWidth - 400), y: 80 };
+            lyricsCustom.value = false;
+            return {
+                x: Math.round(window.innerWidth / 2),
+                y: Math.max(EDGE_MARGIN, window.innerHeight - (window.innerWidth < 768 ? 180 : 150)),
+            };
         }
 
         /* ---------------- 侦听 ---------------- */
@@ -651,6 +857,8 @@ export default {
 
         watch(settings, (value) => writeJSON(STORAGE_KEYS.lyricsSettings, value), { deep: true });
 
+        watch(appearance, (value) => writeJSON(STORAGE_KEYS.appearance, value), { deep: true });
+
         watch(currentSong, (song) => {
             progress.value = 0;
             if (song && song.lrc) {
@@ -663,6 +871,8 @@ export default {
             }
             emit('switch', song);
         });
+
+        watch(mode, () => scheduleCollapse());
 
         watch(playing, (value) => {
             window.clearTimeout(collapseTimer);
@@ -719,6 +929,25 @@ export default {
             switchTo: playIndex,
             setScale,
             resetScale,
+            getMode: () => mode.value,
+            setMode,
+            toggleMode,
+            getVisible: () => visible.value,
+            setVisible,
+            show,
+            hide,
+            toggleVisible,
+            getAppearance: () => ({
+                widget: { ...appearance.value.widget },
+                full: { ...appearance.value.full },
+            }),
+            setAppearance,
+            getLyricsVisible: () => lyricsVisible.value,
+            setLyricsVisible,
+            setPosition,
+            getPosition: () => (position.value ? { ...position.value } : null),
+            setLyricsPosition,
+            getLyricsPosition: () => ({ ...lyricsPos.value }),
             getPlaylist: () => playlist.value,
             getCurrent: () => currentSong.value,
         });
@@ -728,6 +957,8 @@ export default {
         return {
             MIN_SCALE,
             MAX_SCALE,
+            MIN_OPACITY,
+            MAX_BLUR,
             rootEl,
             widgetEl,
             audioEl,
@@ -761,6 +992,12 @@ export default {
             collapsed,
             menu,
             settings,
+            mode,
+            visible,
+            appearanceProxy,
+            opacityPercent,
+            widgetStyle,
+            lyricsPlaceholderColor,
             handlePlay,
             handlePause,
             handleEnded,
@@ -786,8 +1023,19 @@ export default {
             handleEnter,
             handleLeave,
             openSettingsMenu,
+            openAppearanceMenu,
             resetSettings,
             resetScale,
+            setMode,
+            toggleMode,
+            setVisible,
+            show,
+            hide,
+            toggleVisible,
+            setAppearance,
+            setLyricsVisible,
+            setPosition,
+            setLyricsPosition,
         };
     },
 };

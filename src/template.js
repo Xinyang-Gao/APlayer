@@ -1,13 +1,39 @@
 /**
- * 播放器模板（运行时编译，故以字符串形式存放）。
+ * 播放器模板（构建期由 build.mjs 编译成 render 函数，故以字符串形式存放）。
  * 模板中出现的每个标识符都由 player.js 的 setup() 返回。
+ *
+ * 两种形态共用一套 DOM：
+ *   - widget：左下角悬浮小卡，歌词为独立浮层
+ *   - full  ：居中大卡，歌词收进卡片内（右侧下方居中）
  */
+
+/* 歌词行片段：浮层与卡片内歌词共用 */
+const lyricLines = `
+    <template v-if="currentLine || nextLine">
+        <Transition name="lyric-fade" mode="out-in">
+            <div :key="currentLine" class="lyric-line current" :style="currentLineStyle">
+                {{ currentLine || '...' }}
+            </div>
+        </Transition>
+        <Transition name="lyric-fade" mode="out-in">
+            <div v-if="nextLine" :key="nextLine" class="lyric-line next" :style="nextLineStyle">
+                {{ nextLine }}
+            </div>
+        </Transition>
+    </template>
+    <div v-else class="lyrics-placeholder" :style="{ color: lyricsPlaceholderColor }">
+        {{ currentSong ? '纯音乐，请欣赏' : '等待歌词…' }}
+    </div>
+`;
+
 export default `
 <div
     ref="rootEl"
     class="music-player-wrapper"
     :class="{ dragging: dragging }"
+    :data-mode="mode"
     :data-collapsed="collapsed ? 'true' : undefined"
+    :data-visible="visible ? 'true' : 'false'"
     :style="rootStyle"
 >
     <audio
@@ -24,31 +50,18 @@ export default `
         @error="handleError"
     ></audio>
 
-    <!-- 桌面歌词：可拖拽，右键呼出设置 -->
+    <!-- 桌面歌词浮层：仅悬浮形态，可拖拽，右键呼出外观设置 -->
     <div
-        v-if="lyricsVisible"
+        v-if="lyricsVisible && mode === 'widget'"
         class="lyrics-container"
         :class="{ dragging: lyricsDragging }"
         :style="lyricsStyle"
         @pointerdown="startLyricsDrag"
         @contextmenu.prevent="openSettingsMenu"
-    >
-        <template v-if="currentLine || nextLine">
-            <Transition name="lyric-fade" mode="out-in">
-                <div :key="currentLine" class="lyric-line current" :style="currentLineStyle">
-                    {{ currentLine || '...' }}
-                </div>
-            </Transition>
-            <Transition name="lyric-fade" mode="out-in">
-                <div v-if="nextLine" :key="nextLine" class="lyric-line next" :style="nextLineStyle">
-                    {{ nextLine }}
-                </div>
-            </Transition>
-        </template>
-        <div v-else class="lyrics-placeholder" :style="{ color: settings.color }">等待歌词…</div>
+    >${lyricLines}
     </div>
 
-    <!-- 设置菜单：界面缩放 + 歌词字号 + 歌词颜色 -->
+    <!-- 外观设置：缩放 / 透明度 / 模糊度 / 歌词字号与颜色 -->
     <Transition name="fade-slide">
         <div
             v-if="menu.visible"
@@ -57,12 +70,26 @@ export default `
             :style="{ top: menu.y + 'px', left: menu.x + 'px' }"
             @pointerdown.stop
         >
-            <div class="menu-header">设置</div>
+            <div class="menu-header">外观设置</div>
             <div class="menu-item">
                 <label>界面缩放</label>
                 <div class="control-group">
                     <input v-model.number="scale" type="range" :min="MIN_SCALE" :max="MAX_SCALE" step="0.05" />
                     <span class="value">{{ scalePercent }}%</span>
+                </div>
+            </div>
+            <div class="menu-item">
+                <label>背景不透明度</label>
+                <div class="control-group">
+                    <input v-model.number="appearanceProxy.opacity" type="range" :min="MIN_OPACITY" :max="1" step="0.05" />
+                    <span class="value">{{ opacityPercent }}%</span>
+                </div>
+            </div>
+            <div class="menu-item">
+                <label>背景模糊</label>
+                <div class="control-group">
+                    <input v-model.number="appearanceProxy.blur" type="range" :min="0" :max="MAX_BLUR" step="1" />
+                    <span class="value">{{ appearanceProxy.blur }}px</span>
                 </div>
             </div>
             <div class="menu-item">
@@ -86,7 +113,7 @@ export default `
     <div
         ref="widgetEl"
         class="player-widget"
-        :style="{ '--aplayer-scale': scale }"
+        :style="widgetStyle"
         @pointerdown="startDrag"
         @pointerenter="handleEnter"
         @pointerleave="handleLeave"
@@ -122,7 +149,7 @@ export default `
         </div>
 
         <div class="content-container">
-            <div class="top-row">
+            <div class="info-row">
                 <div class="song-info">
                     <span class="song-title" :title="currentSong ? currentSong.name : ''">
                         {{ (currentSong && currentSong.name) || '加载中…' }}
@@ -131,7 +158,13 @@ export default `
                         - {{ currentSong.artist }}
                     </span>
                 </div>
+            </div>
 
+            <!-- 全屏卡片形态：歌词收进卡片，位于右侧下方居中 -->
+            <div v-if="mode === 'full' && lyricsVisible" class="lyric-slot">${lyricLines}
+            </div>
+
+            <div class="controls-row">
                 <div class="controls">
                     <button class="icon-btn" type="button" title="上一首" @click="prev">
                         <svg
@@ -267,7 +300,7 @@ export default `
                             <div v-if="moreOpen" class="more-menu-popup">
                                 <div class="more-menu-item" @click="toggleLyrics">
                                     <span class="menu-icon text-icon">词</span>
-                                    <span class="menu-text">桌面歌词</span>
+                                    <span class="menu-text">歌词</span>
                                     <div class="menu-toggle" :class="{ active: lyricsVisible }"></div>
                                 </div>
                                 <div class="more-menu-item" @click="togglePlaylist">
@@ -315,10 +348,24 @@ export default `
                                     </span>
                                     <span class="menu-text">{{ loopLabel }}</span>
                                 </div>
+                                <div class="more-menu-item" @click="toggleMode">
+                                    <span class="menu-icon text-icon">卡</span>
+                                    <span class="menu-text">全屏卡片</span>
+                                    <div class="menu-toggle" :class="{ active: mode === 'full' }"></div>
+                                </div>
+                                <div class="more-menu-item" @click="openAppearanceMenu">
+                                    <span class="menu-icon text-icon">色</span>
+                                    <span class="menu-text">外观设置</span>
+                                    <span class="menu-value">{{ scalePercent }}%</span>
+                                </div>
                                 <div class="more-menu-item" @click="resetScale">
                                     <span class="menu-icon text-icon">缩</span>
-                                    <span class="menu-text">界面缩放</span>
+                                    <span class="menu-text">重置缩放</span>
                                     <span class="menu-value">{{ scalePercent }}%</span>
+                                </div>
+                                <div class="more-menu-item" @click="hide">
+                                    <span class="menu-icon text-icon">隐</span>
+                                    <span class="menu-text">隐藏播放器</span>
                                 </div>
                             </div>
                         </Transition>

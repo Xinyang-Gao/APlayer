@@ -6,11 +6,14 @@
 
 ## 特性
 
--   **玻璃拟态悬浮卡片**：贴合站点主题令牌，浅色 / 深色自动跟随
+-   **两种形态**：`widget` 悬浮小卡（左下角）/ `full` 全屏卡片（居中，封面在左、歌词在右下方、控件在底部）
+-   **玻璃拟态卡片**：贴合站点主题令牌，浅色 / 深色自动跟随
 -   **自由拖拽**：按住播放器空白处拖动，位置写入 `localStorage`；越界自动收回
 -   **界面缩放**：`Ctrl` / `⌘` + 滚轮（或触控板双指捏合），范围 75%~160%
--   **空闲折叠**：暂停或指针移开后自动收起控件区，悬停 / 播放时展开
--   **桌面歌词**：独立浮层，可拖拽，右键呼出设置（界面缩放 / 字号 / 颜色）
+-   **空闲折叠**：悬浮形态下暂停或指针移开后自动收起控件区（全屏形态常驻展开）
+-   **桌面歌词**：悬浮形态为独立浮层，默认停在屏幕正下方居中，可拖拽，右键呼出外观设置；全屏形态收进卡片内
+-   **显隐与外观**：可整体显示 / 隐藏，可按形态分别调背景不透明度（30%~100%）与模糊度（0~24px）
+-   **全部可外部控制**：形态、显隐、外观、歌词、位置都有对应 API
 -   **播放列表**：网易云歌单（Meting API）或本地 `audio` 数组
 -   **零外部依赖**：样式与模板都打进 JS，引入一个脚本即可
 
@@ -35,13 +38,16 @@ npm run build
 <script src="dist/APlayer.min.js"></script>
 <script>
     const ap = new APlayer({
-        container: document.body,
+        container: document.getElementById('aplayer'),
         audio: [
             { name: '歌曲名', artist: '歌手', url: 'https://.../a.mp3', cover: 'https://.../cover.jpg', lrc: 'https://.../a.lrc' },
         ],
     });
 </script>
 ```
+
+> `container` 请传一个专用节点，不要直接传 `document.body`——挂载会替换容器内容。万一传了 body，
+> 播放器会自动插入 `.aplayer-host` 节点兜底，不会清空页面。
 
 ### 配置项
 
@@ -54,8 +60,10 @@ npm run build
 | `type`          | `string`   | `'playlist'`          | Meting API 的 `type` 参数                     |
 | `api`           | `string`   | `''`                  | 自定义歌单接口，覆盖上面的拼接结果            |
 | `volume`        | `number`   | `0.7`                 | 初始音量 0~1                                  |
-| `lyrics`        | `boolean`  | `true`                | 是否启用桌面歌词                              |
-| `collapseDelay` | `number`   | `500`                 | 空闲多久后折叠（毫秒）                        |
+| `lyrics`        | `boolean`  | `true`                | 是否启用歌词                                  |
+| `mode`          | `string`   | `'widget'`            | 初始形态：`widget` 悬浮小卡 / `full` 全屏卡片 |
+| `visible`       | `boolean`  | `true`                | 初始是否显示                                  |
+| `collapseDelay` | `number`   | `500`                 | 空闲多久后折叠（毫秒，仅悬浮形态）            |
 
 ### 方法
 
@@ -72,6 +80,33 @@ ap.scale(1.2); // 设置界面缩放；不传值则重置为 100%
 ap.destroy();
 ```
 
+### 形态、显隐与外观（外部控制）
+
+```js
+/* 形态：widget 悬浮小卡 / full 全屏卡片 */
+ap.mode(); // → 'widget' | 'full'
+ap.mode('full'); // 切到全屏卡片
+ap.toggleMode(); // 两种形态来回切
+
+/* 显隐：隐藏时音频继续播放 */
+ap.visible(); // → true | false
+ap.hide();
+ap.show();
+ap.toggleVisible();
+
+/* 外观：背景不透明度与模糊度，两种形态各自独立 */
+ap.style(); // → { widget: { opacity, blur }, full: { opacity, blur } }
+ap.style({ opacity: 0.8, blur: 20 }); // 只改当前形态
+ap.style({ widgetOpacity: 0.9, fullBlur: 24 }); // 指定形态（card* 亦可作为 full* 的别名）
+
+/* 歌词与位置 */
+ap.lyrics(false); // 关掉歌词；不传值则读取状态
+ap.toggleLyrics();
+ap.position({ left: 40, top: 200 }); // 播放器位置；传 null 回到默认位置
+ap.lyricsPosition({ x: 120, y: 300 }); // 歌词浮层位置
+ap.lyricsPosition({ centered: true }); // 歌词回到屏幕正下方居中
+```
+
 ### 事件
 
 ```js
@@ -82,6 +117,10 @@ ap.on('switch', (song) => {});
 ap.on('timeupdate', ({ currentTime, duration }) => {});
 ap.on('volumechange', (value) => {});
 ap.on('loopchange', (mode) => {}); // list | one | shuffle
+ap.on('modechange', (mode) => {}); // widget | full
+ap.on('visiblechange', (visible) => {});
+ap.on('appearancechange', ({ mode, opacity, blur }) => {});
+ap.on('lyricschange', (visible) => {});
 ap.on('playlist', (list) => {});
 ap.on('lyrics', (lines) => {});
 ap.on('error', (err) => {});
@@ -115,12 +154,16 @@ ap.on('error', (err) => {});
 
 | Key                       | 内容             |
 | ------------------------- | ---------------- |
-| `player-widget-position`  | 播放器位置       |
-| `player-widget-scale`     | 界面缩放         |
-| `player-widget-collapsed` | 折叠状态         |
-| `lyrics-position`         | 桌面歌词位置     |
-| `lyrics-visible`          | 桌面歌词显隐     |
-| `lyrics-settings`         | 字号与颜色       |
+| `player-widget-position`  | 两种形态各自的播放器位置 |
+| `player-widget-scale`     | 界面缩放             |
+| `player-widget-collapsed` | 折叠状态             |
+| `player-widget-mode`      | 当前形态             |
+| `player-widget-appearance`| 两种形态的不透明度与模糊度 |
+| `lyrics-position`         | 歌词浮层位置（无记录时居中） |
+| `lyrics-visible`          | 歌词显隐             |
+| `lyrics-settings`         | 字号与颜色           |
+
+> 显隐状态不写入存储：刷新后播放器会重新出现，避免出现“播放器找不到了”的困惑。
 
 ## 开发
 

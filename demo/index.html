@@ -45,7 +45,7 @@
             body {
                 margin: 0;
                 min-height: 100vh;
-                padding: 60px 24px 160px;
+                padding: 60px 24px 200px;
                 font-family: var(--font-sans);
                 color: var(--text-color);
                 background: var(--bg-color);
@@ -60,6 +60,12 @@
             h1 {
                 font-size: 1.8rem;
                 margin: 0 0 8px;
+            }
+
+            h2 {
+                font-size: 1rem;
+                margin: 0 0 12px;
+                color: var(--text-secondary);
             }
 
             p {
@@ -99,6 +105,30 @@
                 gap: 8px;
             }
 
+            .slider-row {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-top: 12px;
+                font-size: 13px;
+            }
+
+            .slider-row label {
+                width: 92px;
+                color: var(--text-secondary);
+            }
+
+            .slider-row input[type='range'] {
+                flex: 1;
+                max-width: 220px;
+            }
+
+            .slider-row output {
+                width: 52px;
+                color: var(--text-secondary);
+                text-align: right;
+            }
+
             kbd {
                 padding: 2px 6px;
                 border: 1px solid var(--border-color);
@@ -112,10 +142,11 @@
         <main>
             <h1>APlayer · 玻璃拟态悬浮播放器</h1>
             <p>
-                左下角为播放器本体：可拖拽、可缩放、空闲自动折叠，右上角为可拖拽的桌面歌词（右键唤出设置）。
+                左下角为悬浮形态：可拖拽、可缩放、空闲自动折叠；歌词浮层默认停在屏幕正下方居中，可拖拽、右键呼出外观设置。
             </p>
 
             <div class="panel">
+                <h2>播放控制</h2>
                 <div class="row">
                     <button data-action="toggle">播放 / 暂停</button>
                     <button data-action="prev">上一首</button>
@@ -124,22 +155,59 @@
                     <button data-action="zoom-in">放大</button>
                     <button data-action="zoom-reset">重置缩放</button>
                     <button data-action="theme">切换主题</button>
-                    <button data-action="destroy">销毁实例</button>
                 </div>
-                <p>
-                    拖拽：在播放器空白处按住拖动；缩放：<kbd>Ctrl</kbd> / <kbd>⌘</kbd> +
-                    滚轮（触控板双指）；位置与缩放都会写入 localStorage。
+            </div>
+
+            <div class="panel">
+                <h2>形态与显隐</h2>
+                <div class="row">
+                    <button data-action="mode-full">全屏卡片</button>
+                    <button data-action="mode-widget">悬浮小卡</button>
+                    <button data-action="mode-toggle">切换形态</button>
+                    <button data-action="show">显示播放器</button>
+                    <button data-action="hide">隐藏播放器</button>
+                    <button data-action="lyrics-toggle">歌词开关</button>
+                    <button data-action="lyrics-center">歌词回到居中</button>
+                    <button data-action="reset-position">播放器回默认位</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>背景外观（作用于当前形态）</h2>
+                <div class="slider-row">
+                    <label for="opacity">不透明度</label>
+                    <input id="opacity" type="range" min="0.3" max="1" step="0.05" value="1" />
+                    <output id="opacity-value">100%</output>
+                </div>
+                <div class="slider-row">
+                    <label for="blur">背景模糊</label>
+                    <input id="blur" type="range" min="0" max="24" step="1" value="12" />
+                    <output id="blur-value">12px</output>
+                </div>
+                <p>两套外观各自独立，切换形态时滑块会同步到该形态的当前值。</p>
+            </div>
+
+            <div class="panel">
+                <p style="margin: 0">
+                    拖拽：播放器空白处按住拖动；缩放：<kbd>Ctrl</kbd> / <kbd>⌘</kbd> +
+                    滚轮（触控板双指）；位置、缩放与外观都会写入 localStorage。
                 </p>
             </div>
         </main>
 
+        <!-- 播放器挂在这里。注意：不要直接传 document.body，否则页面内容会被替换掉 -->
+        <div id="aplayer"></div>
+
         <script src="../dist/APlayer.min.js"></script>
         <script>
-            const ap = new APlayer({ container: document.body });
+            const ap = new APlayer({ container: document.getElementById('aplayer') });
 
             ap.on('play', (song) => console.log('[demo] play:', song && song.name));
             ap.on('pause', () => console.log('[demo] pause'));
             ap.on('switch', (song) => console.log('[demo] switch:', song && song.name));
+            ap.on('modechange', (mode) => syncAppearance(mode));
+            ap.on('visiblechange', (v) => console.log('[demo] visible:', v));
+            ap.on('appearancechange', (a) => syncInputs(a));
 
             const actions = {
                 toggle: () => ap.toggle(),
@@ -148,16 +216,54 @@
                 'zoom-in': () => ap.scale(Math.min(1.6, Number(localStorage.getItem('player-widget-scale') || 1) + 0.05)),
                 'zoom-out': () => ap.scale(Math.max(0.75, Number(localStorage.getItem('player-widget-scale') || 1) - 0.05)),
                 'zoom-reset': () => ap.scale(),
+                'mode-full': () => ap.mode('full'),
+                'mode-widget': () => ap.mode('widget'),
+                'mode-toggle': () => ap.toggleMode(),
+                show: () => ap.show(),
+                hide: () => ap.hide(),
+                'lyrics-toggle': () => ap.toggleLyrics(),
+                'lyrics-center': () => ap.lyricsPosition({ centered: true }),
+                'reset-position': () => ap.position(null),
                 theme: () => {
                     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
                     document.documentElement.dataset.theme = next;
                 },
-                destroy: () => ap.destroy(),
             };
 
             document.querySelectorAll('[data-action]').forEach((el) => {
                 el.addEventListener('click', () => actions[el.dataset.action]());
             });
+
+            /* -------- 外观滑块：双向同步当前形态的值 -------- */
+            const opacityInput = document.getElementById('opacity');
+            const blurInput = document.getElementById('blur');
+            const opacityValue = document.getElementById('opacity-value');
+            const blurValue = document.getElementById('blur-value');
+
+            function syncInputs(appearance) {
+                const a = appearance || ap.style();
+                opacityInput.value = a.opacity;
+                blurInput.value = a.blur;
+                opacityValue.textContent = Math.round(a.opacity * 100) + '%';
+                blurValue.textContent = a.blur + 'px';
+            }
+
+            function syncAppearance(mode) {
+                const all = ap.style();
+                syncInputs(all[mode || ap.mode()]);
+            }
+
+            opacityInput.addEventListener('input', () => {
+                ap.style({ opacity: Number(opacityInput.value) });
+                opacityValue.textContent = Math.round(opacityInput.value * 100) + '%';
+            });
+
+            blurInput.addEventListener('input', () => {
+                ap.style({ blur: Number(blurInput.value) });
+                blurValue.textContent = blurInput.value + 'px';
+            });
+
+            syncAppearance();
         </script>
     </body>
 </html>
