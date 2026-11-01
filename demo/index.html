@@ -1,109 +1,163 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>APlayer Demo</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        }
-        .container {
-            max-width: 32rem;
-            margin-left: auto;
-            margin-right: auto;
-            margin-bottom: 150px;
-        }
-        h1 {
-            font-size: 54px;
-            color: #333;
-            margin: 30px 0 10px;
-        }
-        h2 {
-            font-size: 22px;
-            color: #555;
-        }
-        h3 {
-            font-size: 24px;
-            color: #555;
-        }
-        hr {
-            display: block;
-            width: 7rem;
-            height: 1px;
-            margin: 2.5rem 0;
-            background-color: #eee;
-            border: 0;
-        }
-        a {
-            color: #08c;
-            text-decoration: none;
-        }
-        p {
-            font-size: 18px;
-        }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/vconsole/dist/vconsole.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js/dist/hls.min.js"></script>
-    <script src="APlayer.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/color-thief-don@2.0.2/src/color-thief.js"></script>
-</head>
-<body>
-    <div class="container">
-        <h1>APlayer</h1>
-        <h2>Wow, such a beautiful html5 music player</h2>
-        <p>Made by <a href="https://www.anotherhome.net/" target="_blank">DIYgod</a>. Available on <a href="https://github.com/DIYgod/APlayer" target="_blank">GitHub</a>. Licensed MIT.</p>
-        <hr>
-        <h3>Normal</h3>
-        <div id="player1"></div>
-        <p></p>
-        <button onclick="ap1.play()">ap.play()</button>
-        <button onclick="ap1.seek(100)">ap.seek(100)</button>
-        <button onclick="ap1.pause()">ap.pause()</button>
-        <button onclick="ap1.toggle()">ap.toggle()</button>
-        <button onclick="ap1.volume(0.1)">ap.volume(0.1)</button>
-        <button onclick="ap1.addAudio([
-            {
-                name: 'あっちゅ～ま青春!',
-                artist: '七森中☆ごらく部',
-                url: 'https://cn-south-17-aplayer-46154810.oss.dogecdn.com/yuruyuri.mp3',
-                cover: 'https://cn-south-17-aplayer-46154810.oss.dogecdn.com/yuruyuri.jpg'
-            },
-            {
-                name: 'secret base~君がくれたもの~',
-                artist: '茅野愛衣',
-                url: 'https://cn-south-17-aplayer-46154810.oss.dogecdn.com/secretbase.mp3',
-                cover: 'https://cn-south-17-aplayer-46154810.oss.dogecdn.com/secretbase.jpg'
-            },
-            {
-                name: '回レ！雪月花',
-                artist: '小倉唯',
-                url: 'https://cn-south-17-aplayer-46154810.oss.dogecdn.com/snowmoonflowers.mp3',
-                cover: 'https://cn-south-17-aplayer-46154810.oss.dogecdn.com/snowmoonflowers.jpg'
+<html lang="zh-CN" data-theme="light">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>APlayer · 玻璃拟态悬浮播放器</title>
+        <style>
+            /* 模拟个人网站的主题令牌（与 src/css/core/variables.css 保持一致） */
+            :root {
+                --bg-color: #f4f3f0;
+                --surface-color: #ffffff;
+                --text-color: #23231f;
+                --text-secondary: #6d6d66;
+                --accent-color: #ab4f57;
+                --accent-light: #cd8189;
+                --accent-rgb: 171, 79, 87;
+                --border-color: #e4e1da;
+                --border-light: #edebe5;
+                --shadow-color: rgba(35, 35, 31, 0.06);
+                --shadow-md: 0 6px 18px var(--shadow-color);
+                --shadow-offset: 6px 6px 0 -2px rgba(var(--accent-rgb), 0.07);
+                --radius-lg: 14px;
+                --radius-xl: 18px;
+                --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+                    'Microsoft YaHei', sans-serif;
             }
-        ])">ap.addAudio(...)</button>
-        <button onclick="ap1.destroy()">ap.destroy()</button>
-        <h3>With playlist</h3>
-        <div id="player4" class="aplayer"></div>
-        <p></p>
-        <button onclick="ap4.switchAudio(2)">ap.switchAudio(2)</button>
-        <h3>With lyrics</h3>
-        <div id="player3" class="aplayer"></div>
-        <h3>With playlist and lyrics</h3>
-        <div id="player5" class="aplayer"></div>
-        <h3>Narrow</h3>
-        <div id="player2" class="aplayer"></div>
-        <h3>HLS</h3>
-        <div id="player6" class="aplayer"></div>
-        <div id="player7" class="aplayer"></div>
-        <div id="player8" class="aplayer"></div>
-    </div>
-    <script>
-        if (/mobile/i.test(window.navigator.userAgent)) {
-            new VConsole();
-        }
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
-    <script src="demo.js"></script>
-</body>
+
+            [data-theme='dark'] {
+                --bg-color: #101015;
+                --surface-color: #17171e;
+                --text-color: #e9ebf0;
+                --text-secondary: #a2a6b4;
+                --accent-color: #5aa9ff;
+                --accent-light: #a3d4ff;
+                --accent-rgb: 90, 169, 255;
+                --border-color: #2c2c37;
+                --border-light: #24242e;
+                --shadow-color: rgba(0, 0, 0, 0.5);
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            body {
+                margin: 0;
+                min-height: 100vh;
+                padding: 60px 24px 160px;
+                font-family: var(--font-sans);
+                color: var(--text-color);
+                background: var(--bg-color);
+                transition: background 0.3s, color 0.3s;
+            }
+
+            main {
+                max-width: 720px;
+                margin: 0 auto;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+                margin: 0 0 8px;
+            }
+
+            p {
+                line-height: 1.7;
+                color: var(--text-secondary);
+            }
+
+            .panel {
+                margin-top: 24px;
+                padding: 18px 20px;
+                border: 1px solid var(--border-color);
+                border-radius: var(--radius-xl);
+                background: var(--surface-color);
+                box-shadow: var(--shadow-md);
+            }
+
+            button {
+                padding: 8px 14px;
+                border: 1px solid var(--border-color);
+                border-radius: 999px;
+                background: transparent;
+                color: var(--text-color);
+                font-family: inherit;
+                font-size: 13px;
+                cursor: pointer;
+                transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+            }
+
+            button:hover {
+                border-color: var(--accent-color);
+                color: var(--accent-color);
+            }
+
+            .row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            kbd {
+                padding: 2px 6px;
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                background: var(--bg-color);
+                font-size: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <h1>APlayer · 玻璃拟态悬浮播放器</h1>
+            <p>
+                左下角为播放器本体：可拖拽、可缩放、空闲自动折叠，右上角为可拖拽的桌面歌词（右键唤出设置）。
+            </p>
+
+            <div class="panel">
+                <div class="row">
+                    <button data-action="toggle">播放 / 暂停</button>
+                    <button data-action="prev">上一首</button>
+                    <button data-action="next">下一首</button>
+                    <button data-action="zoom-out">缩小</button>
+                    <button data-action="zoom-in">放大</button>
+                    <button data-action="zoom-reset">重置缩放</button>
+                    <button data-action="theme">切换主题</button>
+                    <button data-action="destroy">销毁实例</button>
+                </div>
+                <p>
+                    拖拽：在播放器空白处按住拖动；缩放：<kbd>Ctrl</kbd> / <kbd>⌘</kbd> +
+                    滚轮（触控板双指）；位置与缩放都会写入 localStorage。
+                </p>
+            </div>
+        </main>
+
+        <script src="../dist/APlayer.min.js"></script>
+        <script>
+            const ap = new APlayer({ container: document.body });
+
+            ap.on('play', (song) => console.log('[demo] play:', song && song.name));
+            ap.on('pause', () => console.log('[demo] pause'));
+            ap.on('switch', (song) => console.log('[demo] switch:', song && song.name));
+
+            const actions = {
+                toggle: () => ap.toggle(),
+                prev: () => ap.prev(),
+                next: () => ap.next(),
+                'zoom-in': () => ap.scale(Math.min(1.6, Number(localStorage.getItem('player-widget-scale') || 1) + 0.05)),
+                'zoom-out': () => ap.scale(Math.max(0.75, Number(localStorage.getItem('player-widget-scale') || 1) - 0.05)),
+                'zoom-reset': () => ap.scale(),
+                theme: () => {
+                    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+                    document.documentElement.dataset.theme = next;
+                },
+                destroy: () => ap.destroy(),
+            };
+
+            document.querySelectorAll('[data-action]').forEach((el) => {
+                el.addEventListener('click', () => actions[el.dataset.action]());
+            });
+        </script>
+    </body>
 </html>

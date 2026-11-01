@@ -1,4 +1,12 @@
-.idea
-node_modules
-demo2
-npm-debug.log
+node_modules/
+dist/
+*.log
+.DS_Store
+.idea/
+.vscode/
+
+# 构建期生成，勿提交
+src/vue-global.cjs
+src/render.generated.cjs
+
+# linkedom 仅用于开发期 DOM 测试
