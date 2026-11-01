@@ -41,18 +41,16 @@
     width: fit-content;
     max-width: 480px;
     padding: 6px 12px 6px 6px;
+    position: relative;
     border: 1px solid var(--border-color, #e4e1da);
     border-radius: var(--radius-xl, 18px);
-    background: var(--surface-color, #fff);
-    -webkit-backdrop-filter: blur(var(--aplayer-blur, 12px));
-    backdrop-filter: blur(var(--aplayer-blur, 12px));
+    /* 玻璃层交给 ::before，卡片自身透明，文字与控件才不会跟着一起变淡 */
+    background: transparent;
     box-shadow: var(--shadow-md, 0 6px 18px rgba(0, 0, 0, 0.06)),
         var(--shadow-offset, 6px 6px 0 -2px rgba(var(--accent-rgb, 171, 79, 87), 0.07));
     transform: scale(var(--aplayer-scale, 1));
     transform-origin: bottom left;
     cursor: grab;
-    /* 只让背景玻璃变透明，文字与控件保持清晰 */
-    background: color-mix(in srgb, var(--surface-color, #fff) calc(var(--aplayer-opacity, 1) * 100%), transparent);
     -webkit-user-select: none;
     -moz-user-select: none;
     user-select: none;
@@ -62,15 +60,21 @@
 }
 
 [data-theme='dark'] .music-player-wrapper .player-widget {
-    /* 背景同样走 --surface-color 与 --aplayer-opacity */
     border-color: var(--border-color, #2c2c37);
 }
 
-/* 不支持 color-mix 时退化为整体透明度 */
-@supports not (background: color-mix(in srgb, red 50%, blue)) {
-    .music-player-wrapper .player-widget {
-        opacity: var(--aplayer-opacity, 1);
-    }
+/* 玻璃层：不透明度与模糊度都作用在这一层，内容层不受影响 */
+.music-player-wrapper .player-widget::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--surface-color, #fff);
+    opacity: var(--aplayer-opacity, 1);
+    -webkit-backdrop-filter: blur(var(--aplayer-blur, 12px));
+    backdrop-filter: blur(var(--aplayer-blur, 12px));
+    pointer-events: none;
 }
 
 /* 拖拽反馈 */

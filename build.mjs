@@ -67,17 +67,20 @@ function writeVueShim() {
 }
 
 /** 编译模板 → src/render.generated.js */
-function generateRender() {
+async function generateRender() {
     installDomStub();
     const full = production ? 'vue.global.prod.js' : 'vue.global.js';
     const Vue = loadVue(full);
     globalThis.Vue = Vue; // global 构建的 render 代码从闭包外取 _Vue
 
-    const template = readFileSync(resolve(root, 'src/template.js'), 'utf8');
-    const start = template.indexOf('`');
-    const end = template.lastIndexOf('`');
+    // 直接 import 模块（而不是读文件文本），模板里的 ${...} 片段拼插才会真正展开
+    const templateModule = await import(new URL('./src/template.js', import.meta.url).href);
+    const source = templateModule.default;
+    if (typeof source !== 'string' || source.includes('${')) {
+        throw new Error('模板内容异常：仍存在未展开的 ${...} 插值');
+    }
     // 关闭静态提升：这样编译产物里不会出现 render 函数之外的常量声明
-    const render = Vue.compile(template.slice(start + 1, end), { hoistStatic: false }).toString();
+    const render = Vue.compile(source, { hoistStatic: false }).toString();
 
     writeFileSync(
         resolve(root, 'src/render.generated.cjs'),
@@ -90,7 +93,7 @@ function generateRender() {
 }
 
 async function run() {
-    generateRender();
+    await generateRender();
     writeVueShim();
     mkdirSync(resolve(root, 'dist'), { recursive: true });
 

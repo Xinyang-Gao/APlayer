@@ -42,6 +42,21 @@
                 box-sizing: border-box;
             }
 
+            /* 装饰性纹理背景：毛玻璃的模糊与半透明需要有点东西可“透”，
+               否则在纯色背景上怎么调都看不出差别 */
+            .backdrop {
+                position: fixed;
+                inset: 0;
+                z-index: -1;
+                background-image: radial-gradient(circle at 18% 82%, rgba(171, 79, 87, 0.35), transparent 42%),
+                    radial-gradient(circle at 78% 24%, rgba(90, 169, 255, 0.32), transparent 45%),
+                    repeating-linear-gradient(
+                        45deg,
+                        rgba(35, 35, 31, 0.06) 0 12px,
+                        transparent 12px 24px
+                    );
+            }
+
             body {
                 margin: 0;
                 min-height: 100vh;
@@ -139,6 +154,8 @@
         </style>
     </head>
     <body>
+        <div class="backdrop"></div>
+
         <main>
             <h1>APlayer · 玻璃拟态悬浮播放器</h1>
             <p>
@@ -184,7 +201,10 @@
                     <input id="blur" type="range" min="0" max="24" step="1" value="12" />
                     <output id="blur-value">12px</output>
                 </div>
-                <p>两套外观各自独立，切换形态时滑块会同步到该形态的当前值。</p>
+                <p>
+                    两套外观各自独立，切换形态时滑块会同步到该形态的当前值。模糊度需要有纹理才看得出差别，
+                    所以本页垫了一层装饰背景。
+                </p>
             </div>
 
             <div class="panel">

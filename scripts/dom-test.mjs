@@ -168,6 +168,16 @@ async function main() {
     check('传 body 时保留页面内容', !!document.getElementById('keep'));
     check('传 body 时自动建挂载点', !!document.querySelector('.aplayer-host .player-widget'));
 
+    /* ---------- 样式规则：玻璃层必须真的消费这两个变量 ---------- */
+    const css = readFileSync(new URL('../dist/APlayer.min.css', import.meta.url), 'utf8');
+    check('玻璃层伪元素存在', css.includes('.player-widget::before') || css.includes('.player-widget:before'));
+    check('模糊度变量被 backdrop-filter 消费', /backdrop-filter:\s*blur\(var\(--aplayer-blur/.test(css));
+    check('不透明度变量被玻璃层消费', /opacity:\s*var\(--aplayer-opacity/.test(css));
+    check(
+        '模板里没有残留的插值占位符',
+        !readFileSync(new URL('../src/render.generated.cjs', import.meta.url), 'utf8').includes('lyricLines')
+    );
+
     /* ---------- 对外方法 ---------- */
     check(
         '对外方法齐全',
