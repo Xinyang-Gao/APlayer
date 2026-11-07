@@ -171,11 +171,11 @@
 /* 全屏卡片形态：封面在左，右侧依次为标题、歌词、控件、进度 */
 .music-player-wrapper[data-mode='full'] .player-widget {
     display: grid;
-    grid-template-columns: 132px 1fr;
-    gap: 16px;
-    width: min(560px, calc(100vw - 48px));
+    grid-template-columns: 200px 1fr;
+    gap: 24px;
+    width: min(760px, calc(100vw - 64px));
     max-width: none;
-    padding: 16px;
+    padding: 24px;
     transform-origin: center;
 }
 
@@ -184,10 +184,10 @@
 }
 
 .music-player-wrapper[data-mode='full'] .cover-wrapper {
-    width: 132px;
-    height: 132px;
+    width: 200px;
+    height: 200px;
     border-width: 0;
-    border-radius: 16px;
+    border-radius: 20px;
 }
 
 .music-player-wrapper[data-mode='full'] .cover-img.rotating {
@@ -197,18 +197,18 @@
 .music-player-wrapper[data-mode='full'] .content-container {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    min-height: 132px;
+    gap: 12px;
+    min-height: 200px;
 }
 
 .music-player-wrapper[data-mode='full'] .song-title {
     max-width: 100%;
-    font-size: 17px;
+    font-size: 22px;
 }
 
 .music-player-wrapper[data-mode='full'] .song-artist {
     max-width: 100%;
-    font-size: 13px;
+    font-size: 15px;
 }
 
 .music-player-wrapper[data-mode='full'] .lyric-slot {
@@ -217,6 +217,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 6px;
+    min-height: 96px;
     overflow: hidden;
     text-align: center;
 }
@@ -644,31 +646,33 @@
     background: rgba(0, 0, 0, 0.6);
 }
 
-.music-player-wrapper .lyric-line {
+/* 歌词统一反色：白字 + difference 混合，自动取所在底板的补色，
+   浅底变深字、深底变浅字、彩色底变补色，不再按主题 / 形态切换颜色。
+   深色描边是兜底：即便宿主浏览器不支持混合模式，字形依然可辨。 */
+.music-player-wrapper .lyric-line,
+.music-player-wrapper .lyrics-placeholder {
     display: block;
-    font-weight: 600;
+    color: #fff;
+    mix-blend-mode: difference;
+    text-shadow: 0 0 1px rgba(0, 0, 0, 0.9), 0 1px 3px rgba(0, 0, 0, 0.7);
     line-height: 1.2;
-    opacity: 0.9;
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 0.95;
 }
 
-.music-player-wrapper .lyric-line.current {
-    text-shadow: 0 2px 10px rgba(255, 255, 255, 0.8);
+.music-player-wrapper .lyric-line {
+    font-weight: 600;
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .music-player-wrapper .lyric-line.next {
     font-weight: 500;
-    opacity: 0.6;
-}
-
-[data-theme='dark'] .music-player-wrapper .lyric-line.current {
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    opacity: 0.7;
 }
 
 .music-player-wrapper .lyrics-placeholder {
     font-size: 14px;
     font-weight: 500;
-    opacity: 0.8;
+    opacity: 0.85;
 }
 
 /* ---------------- 设置菜单 ---------------- */
@@ -744,6 +748,12 @@
     font-size: 12px;
     cursor: pointer;
     transition: color 0.2s, background-color 0.2s, border-color 0.2s;
+}
+
+.music-player-wrapper .menu-hint {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text-secondary, #6d6d66);
 }
 
 .music-player-wrapper .text-btn:hover {
@@ -907,17 +917,28 @@
     }
 
     .music-player-wrapper[data-mode='full'] .player-widget {
-        grid-template-columns: 96px 1fr;
-        gap: 12px;
+        grid-template-columns: 120px 1fr;
+        gap: 16px;
+        width: min(760px, calc(100vw - 32px));
+        padding: 16px;
     }
 
     .music-player-wrapper[data-mode='full'] .cover-wrapper {
-        width: 96px;
-        height: 96px;
+        width: 120px;
+        height: 120px;
     }
 
     .music-player-wrapper[data-mode='full'] .content-container {
-        min-height: 96px;
+        gap: 8px;
+        min-height: 120px;
+    }
+
+    .music-player-wrapper[data-mode='full'] .song-title {
+        font-size: 18px;
+    }
+
+    .music-player-wrapper[data-mode='full'] .song-artist {
+        font-size: 13px;
     }
 
     .music-player-wrapper .lyrics-container {

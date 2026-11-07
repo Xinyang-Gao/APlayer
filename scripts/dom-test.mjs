@@ -4,6 +4,7 @@
  * 仅用于开发校验，不参与构建。
  */
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import vm from 'node:vm';
 import { parseHTML } from 'linkedom';
 
@@ -53,7 +54,11 @@ async function main() {
     window.innerWidth = 1280;
     window.innerHeight = 800;
 
-    const code = readFileSync(new URL('../dist/APlayer.min.js', import.meta.url), 'utf8');
+    // 默认测 dist 产物；设 APLAYER_BUNDLE 可指向别处（如站点 vendor 目录）的同版本文件
+    const bundlePath = process.env.APLAYER_BUNDLE
+        ? resolve(process.env.APLAYER_BUNDLE)
+        : new URL('../dist/APlayer.min.js', import.meta.url);
+    const code = readFileSync(bundlePath, 'utf8');
     vm.createContext(sandbox);
     vm.runInContext(code, sandbox);
 
@@ -173,6 +178,12 @@ async function main() {
     check('玻璃层伪元素存在', css.includes('.player-widget::before') || css.includes('.player-widget:before'));
     check('模糊度变量被 backdrop-filter 消费', /backdrop-filter:\s*blur\(var\(--aplayer-blur/.test(css));
     check('不透明度变量被玻璃层消费', /opacity:\s*var\(--aplayer-opacity/.test(css));
+    /* 歌词反色：不再有形态 / 主题条件色 */
+    const renderSource = readFileSync(new URL('../src/render.generated.cjs', import.meta.url), 'utf8');
+    check('歌词统一用 difference 反色', /mix-blend-mode:\s*difference/.test(css));
+    check('产物里不再有歌词颜色选择器', !renderSource.includes('type:"color"'));
+    check('产物里不再读取 settings.color', !renderSource.includes('settings.color'));
+    check('全屏卡片宽度已放大', css.includes('min(760px'));
     check(
         '模板里没有残留的插值占位符',
         !readFileSync(new URL('../src/render.generated.cjs', import.meta.url), 'utf8').includes('lyricLines')

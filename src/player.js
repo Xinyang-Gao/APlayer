@@ -36,7 +36,8 @@ const LOOP_MODES = [
     { value: 'shuffle', label: '随机播放' },
 ];
 
-const DEFAULT_SETTINGS = { fontSize: 24, color: '#ffffff' };
+// 歌词只保留字号；颜色由 CSS 的 difference 混合自动与背景反色，不再需要自定义色值
+const DEFAULT_SETTINGS = { fontSize: 24 };
 
 /* ---------------- 组件 ---------------- */
 
@@ -156,22 +157,14 @@ export default {
             return { left: `${x}px`, top: `${y}px` };
         });
 
-        /* 卡片内歌词跟着文字色走，浮层歌词才用自定义颜色 */
-        const isInCard = computed(() => mode.value === 'full');
-
+        /* 歌词只按字号排布；浮层与卡片内完全一致，颜色统一交给 CSS 反色 */
         const currentLineStyle = computed(() => ({
-            fontSize: `${Math.round(settings.value.fontSize * (isInCard.value ? 0.62 : 1))}px`,
-            color: isInCard.value ? 'var(--text-color, #23231f)' : settings.value.color,
+            fontSize: `${settings.value.fontSize}px`,
         }));
 
         const nextLineStyle = computed(() => ({
-            fontSize: `${Math.round(settings.value.fontSize * (isInCard.value ? 0.46 : 0.75))}px`,
-            color: isInCard.value ? 'var(--text-secondary, #6d6d66)' : settings.value.color,
+            fontSize: `${Math.round(settings.value.fontSize * 0.75)}px`,
         }));
-
-        const lyricsPlaceholderColor = computed(() =>
-            isInCard.value ? 'var(--text-secondary, #6d6d66)' : settings.value.color
-        );
 
         /* ---------------- 工具函数 ---------------- */
 
@@ -997,7 +990,6 @@ export default {
             appearanceProxy,
             opacityPercent,
             widgetStyle,
-            lyricsPlaceholderColor,
             handlePlay,
             handlePause,
             handleEnded,

@@ -21,7 +21,7 @@ const lyricLines = `
             </div>
         </Transition>
     </template>
-    <div v-else class="lyrics-placeholder" :style="{ color: lyricsPlaceholderColor }">
+    <div v-else class="lyrics-placeholder">
         {{ currentSong ? '纯音乐，请欣赏' : '等待歌词…' }}
     </div>
 `;
@@ -61,7 +61,7 @@ export default `
     >${lyricLines}
     </div>
 
-    <!-- 外观设置：缩放 / 透明度 / 模糊度 / 歌词字号与颜色 -->
+    <!-- 外观设置：缩放 / 透明度 / 模糊度 / 歌词字号（颜色自动反色，无需设置） -->
     <Transition name="fade-slide">
         <div
             v-if="menu.visible"
@@ -100,10 +100,10 @@ export default `
                 </div>
             </div>
             <div class="menu-item">
-                <label>歌词颜色</label>
+                <label>歌词</label>
                 <div class="control-group">
-                    <input v-model="settings.color" type="color" />
-                    <button class="text-btn" type="button" @click="resetSettings">重置</button>
+                    <span class="menu-hint">自动与背景反色</span>
+                    <button class="text-btn" type="button" @click="resetSettings">重置字号</button>
                 </div>
             </div>
         </div>
